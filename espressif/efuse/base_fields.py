@@ -258,7 +258,7 @@ class EfuseBlockBase(EfuseProtectBase):
         data = BitString(bytes=new_data[::-1], length=len(new_data) * 8)
         if self.parent.debug:
             print("\twritten : {} ->\n\tto write: {}".format(self.get_bitstring(), data))
-        self.wr_bitarray.overwrite(data, pos=0)
+        self.wr_bitarray.overwrite(self.wr_bitarray | data, pos=0)
 
     def burn_words(self, words):
         self.parent.efuse_controller_setup()
@@ -467,12 +467,16 @@ class EfuseFieldBase(EfuseProtectBase):
                 return BitArray(self.efuse_type + "={}".format(new_value))
 
     def check_new_value(self, bitarray_new_value):
-        bitarray_old_value = self.get_bitstring()
+        bitarray_old_value = self.get_bitstring() | self.get_bitstring(from_read=False)
         if bitarray_new_value.len != bitarray_old_value.len:
             raise esptool.FatalError("For {} efuse, the length of the new value is wrong, expected {} bits, was {} bits."
                                      .format(self.name, bitarray_old_value.len, bitarray_new_value.len))
         if bitarray_new_value == bitarray_old_value:
             error_msg = "\tThe same value for {} is already burned. Do not change the efuse.".format(self.name)
+            print(error_msg)
+            bitarray_new_value.set(0)
+        elif bitarray_new_value == self.get_bitstring(from_read=False):
+            error_msg = "\tThe same value for {} is already prepared for the burn operation.".format(self.name)
             print(error_msg)
             bitarray_new_value.set(0)
         else:
